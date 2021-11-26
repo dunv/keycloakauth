@@ -3,109 +3,161 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/coreos/go-oidc"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/dunv/uhttp"
 	"github.com/dunv/ulog"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
+
+	jwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
+var ISSUER = "https://keycloak.unverricht.net/auth/realms/Unverricht"
+
 func main() {
-
 	ctx := context.Background()
-	provider, err := oidc.NewProvider(ctx, "https://keycloak.unverricht.net/auth/realms/unverricht/protocol/openid-connect")
-	if err != nil {
-		// handle error
-	}
 
-	conf := &oauth2.Config{
-		ClientID:     "brauen",
-		ClientSecret: "2e54f99f-60b6-428c-baa4-e185c01a3559",
-		Scopes:       []string{"email", "openid"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://keycloak.unverricht.net/auth/realms/unverricht/protocol/openid-connect/auth",
-			TokenURL: "https://keycloak.unverricht.net/auth/realms/unverricht/protocol/openid-connect/token",
-		},
-		RedirectURL: "http://localhost:8080/auth/complete",
-	}
-	nonce := uuid.New().String()
-
-	res, err := http.Get("https://keycloak.unverricht.net/auth/realms/unverricht/.well-known/openid-configuration")
+	// Discover endpoints using openID connect standard
+	provider, err := oidc.NewProvider(ctx, ISSUER)
 	if err != nil {
 		ulog.Fatal(err)
 	}
 
-	u := uhttp.NewUHTTP(uhttp.WithSendPanicInfoToClient(true))
+	// Extract additional information from provider
+	keycloakClaims := KeycloakClaims{}
+	err = provider.Claims(&keycloakClaims)
+	if err != nil {
+		ulog.Fatal(err)
+	}
 
-	u.Handle("/auth/complete", uhttp.NewHandler(
-		uhttp.WithOptionalGet(uhttp.R{
-			"state":         uhttp.STRING,
-			"session_state": uhttp.STRING,
-			"code":          uhttp.STRING,
-			"error":         uhttp.STRING,
-		}),
-		uhttp.WithGet(func(r *http.Request, returnCode *int) interface{} {
-			getErr := uhttp.GetAsString("error", r)
-			if getErr != nil && *getErr != "" {
-				return errors.New(*getErr)
-			}
+	// Obtain verifier
+	jwks := oidc.NewRemoteKeySet(ctx, keycloakClaims.JWKSURI)
 
-			state := uhttp.GetAsString("state", r)
-			sessionState := uhttp.GetAsString("session_state", r)
-			code := uhttp.GetAsString("code", r)
-			token, err := conf.Exchange(ctx, *code)
-			if err != nil {
-				return err
-			}
+	// Init oauth with discovered endpoints
+	conf := &oauth2.Config{
+		ClientID:     "brauen",
+		ClientSecret: "2e54f99f-60b6-428c-baa4-e185c01a3559",
+		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		Endpoint:     provider.Endpoint(),
+		RedirectURL:  "http://localhost:8080/auth/complete",
+	}
 
-			return map[string]interface{}{
-				"state":         *state,
-				"session_state": *sessionState,
-				"code":          *code,
-				"token":         token,
-			}
-		}),
-	))
+	// Init verifier
+	verifier := provider.Verifier(&oidc.Config{ClientID: conf.ClientID})
+
+	u := uhttp.NewUHTTP(
+		uhttp.WithSendPanicInfoToClient(true),
+		uhttp.WithGranularLogging(false, true, false),
+	)
 
 	u.Handle("/auth/login", uhttp.NewHandler(
 		uhttp.WithGet(func(r *http.Request, returnCode *int) interface{} {
 			w := r.Context().Value(uhttp.CtxKeyResponseWriter).(http.ResponseWriter)
-			url := conf.AuthCodeURL(nonce, oauth2.AccessTypeOffline)
-			http.Redirect(w, r, url, http.StatusPermanentRedirect)
+
+			// create and set state in client
+			state := uuid.New().String()
+			stateCookie := &http.Cookie{
+				Name:     "state",
+				Value:    state,
+				MaxAge:   int(time.Hour.Seconds()),
+				Secure:   r.TLS != nil,
+				HttpOnly: true,
+			}
+			http.SetCookie(w, stateCookie)
+
+			// create and set nonce in client
+			nonce := uuid.New().String()
+			nonceCookie := &http.Cookie{
+				Name:     "nonce",
+				Value:    nonce,
+				MaxAge:   int(time.Hour.Seconds()),
+				Secure:   r.TLS != nil,
+				HttpOnly: true,
+			}
+			http.SetCookie(w, nonceCookie)
+
+			// redirect user
+			http.Redirect(w, r, conf.AuthCodeURL(state, oidc.Nonce(nonce)), http.StatusFound)
 			return nil
+		}),
+	))
+
+	u.Handle("/auth/complete", uhttp.NewHandler(
+		uhttp.WithGet(func(r *http.Request, returnCode *int) interface{} {
+			// Verify state
+			// compare value in get-request (from redirect) to value saved in cookie
+			stateCookie, err := r.Cookie("state")
+			if err != nil {
+				return errors.New("stateCookie not found")
+			}
+			if r.URL.Query().Get("state") != stateCookie.Value {
+				return errors.New("state-cookie and state from redirect do not match")
+			}
+
+			// Exchange code with token (talking to oAuth server)
+			token, err := conf.Exchange(ctx, r.URL.Query().Get("code"))
+			if err != nil {
+				return err
+			}
+
+			// Extract, parse and validate id_token (according to oidc spec)
+			rawIDToken, ok := token.Extra("id_token").(string)
+			if !ok {
+				return fmt.Errorf("could not extract id_token")
+			}
+			idToken, err := verifier.Verify(ctx, rawIDToken)
+			if err != nil {
+				return fmt.Errorf("could not verify id_token")
+			}
+
+			// Verify nonce
+			// compare value saved in cookie with value encoded in id_token
+			nonceCookie, err := r.Cookie("nonce")
+			if err != nil {
+				return errors.New("nonceCookie not found")
+			}
+			if idToken.Nonce != nonceCookie.Value {
+				return errors.New("nonce-cookie and id_token.nonce do not match")
+			}
+
+			return map[string]interface{}{
+				"refresh_token": token.RefreshToken,
+				"access_token":  token.AccessToken,
+			}
 		}),
 	))
 
 	u.Handle("/api", uhttp.NewHandler(
 		uhttp.WithGet(func(r *http.Request, returnCode *int) interface{} {
-			authParts := strings.Split(r.Header.Get("Authorization"), "Bearer ")
-			if len(authParts) != 2 {
-				return errors.New("could not parse Authorization Header")
-			}
+			accessToken := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
 
-			accessToken := authParts[1]
-
-			token, err := jwt.Parse(accessToken, func(t *jwt.Token) (interface{}, error) {
-				spew.Dump(t)
-				return nil, errors.New("test")
-			})
+			// Verify that the token is signed by someone we trust
+			_, err := jwks.VerifySignature(ctx, accessToken)
 			if err != nil {
-				return errors.New("could not parse accessToken")
+				return err
 			}
-			return token
+
+			// Deserialize contents
+			token, err := jwt.ParseSigned(accessToken)
+			if err != nil {
+				return err
+			}
+
+			// extract claims without verification: verification has been done before
+			claims := make(map[string]interface{})
+			err = token.UnsafeClaimsWithoutVerification(&claims)
+			if err != nil {
+				return err
+			}
+
+			return claims
 		}),
 	))
-
-	// client := conf.Client(ctx, tok)
-	// res, err := client.Post("https://keycloak.unverricht.net/auth/realms/unverricht/protocol/openid-connect/token/introspect", "application/json", nil)
-	// if err != nil
-	// 	ulog.Fatal(err)
-	// }
 
 	ulog.FatalIfError(u.ListenAndServe())
 }

@@ -3,12 +3,12 @@ module oauth
 go 1.17
 
 require (
-	github.com/davecgh/go-spew v1.1.1
-	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/coreos/go-oidc/v3 v3.1.0
 	github.com/dunv/uhttp v1.1.2
 	github.com/dunv/ulog v1.0.24
 	github.com/google/uuid v1.3.0
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 require (
@@ -23,6 +23,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sys v0.0.0-20211013075003-97ac67df715c // indirect
 	google.golang.org/appengine v1.6.6 // indirect
