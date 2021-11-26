@@ -1,4 +1,4 @@
-module oauth
+module github.com/dunv/keycloakauth
 
 go 1.17
 
