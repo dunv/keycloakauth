@@ -17,8 +17,6 @@ import (
 	jwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
-var ISSUER = "https://keycloak.unverricht.net/auth/realms/Unverricht"
-
 type KeycloakAuth struct {
 	ctx          context.Context
 	serverURL    string
