@@ -92,8 +92,7 @@ func (k *KeycloakAuth) SetupHandlers(u *uhttp.UHTTP) {
 			}
 
 			return map[string]interface{}{
-				"refresh_token":    token.RefreshToken,
-				"access_token":     token.AccessToken,
+				"token":            token,
 				"id_token":         rawIDToken,
 				"id_token_content": idToken,
 			}

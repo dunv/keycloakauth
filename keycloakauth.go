@@ -2,6 +2,8 @@ package keycloakauth
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -54,6 +56,6 @@ func NewKeycloakAuth(
 		provider:        provider,
 		idTokenVerifier: provider.Verifier(&oidc.Config{ClientID: clientID}),
 		remoteKeySet:    oidc.NewRemoteKeySet(ctx, keycloakWellKnown.JWKSURI),
-		apiURL:          apiURL,
+		apiURL:          fmt.Sprintf("%s/keycloakauth/complete", strings.TrimSuffix(apiURL, "/")),
 	}, nil
 }

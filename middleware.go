@@ -37,7 +37,7 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 			}
 
 			if !accessGranted {
-				ulog.Tracef("Unauthorized: user does not have access to resource (%s)", err)
+				ulog.Tracef("Unauthorized: user does not have access to resource")
 				u.RenderError(w, r, fmt.Errorf("Unauthorized"))
 				return
 			}
@@ -51,13 +51,19 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 	}
 }
 
-// Get token from request if RequireAuth middleware has been added to handler
+// Get token from context if RequireAuth middleware has been added to handler
 // Will not consume resources unnecessarily
-func TokenFromRequest(r *http.Request) KeycloakToken {
-	if token, ok := r.Context().Value(CtxKeyKeycloakUser).(KeycloakToken); ok {
+func TokenFromContext(ctx context.Context) KeycloakToken {
+	if token, ok := ctx.Value(CtxKeyKeycloakUser).(KeycloakToken); ok {
 		return token
 	}
 	panic("usage of keycloakUser without registering middleware")
+}
+
+// Get token from request if RequireAuth middleware has been added to handler
+// Will not consume resources unnecessarily
+func TokenFromRequest(r *http.Request) KeycloakToken {
+	return TokenFromContext(r.Context())
 }
 
 // Get token from request without middleware. Will execute all required JWT parsing
@@ -91,6 +97,7 @@ func (k *KeycloakAuth) Permission(fn ...HasAccessFn) func(*http.Request) bool {
 	return func(r *http.Request) bool {
 		token, err := k.TokenFromRequest(r)
 		if err != nil {
+			ulog.Trace(err)
 			return false
 		}
 		accessGranted := len(fn) == 0
