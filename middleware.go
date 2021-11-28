@@ -51,6 +51,25 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 	}
 }
 
+// Add user information if it is there. If not, just continue
+func (k *KeycloakAuth) OptionalAuth(u *uhttp.UHTTP) func(next http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			token, err := k.TokenFromRequest(r)
+			if err != nil {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// add user to context
+			ctx := context.WithValue(r.Context(), CtxKeyKeycloakUser, *token)
+			ulog.LogIfError(uhttp.AddLogOutput(w, "authMethod", "jwt"))
+			ulog.LogIfError(uhttp.AddLogOutput(w, "user", token.PreferredUsername))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		}
+	}
+}
+
 // Get token from context if RequireAuth middleware has been added to handler
 // Will not consume resources unnecessarily
 func TokenFromContext(ctx context.Context) KeycloakToken {
