@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -12,18 +13,31 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func (k *KeycloakAuth) SetupHandlers(u *uhttp.UHTTP) {
+func (k *KeycloakAuth) SetupHandlers(u *uhttp.UHTTP, redirectURL string) {
 	conf := &oauth2.Config{
 		ClientID:     k.clientID,
 		ClientSecret: k.clientSecret,
 		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
 		Endpoint:     k.provider.Endpoint(),
-		RedirectURL:  k.apiURL,
+		RedirectURL:  fmt.Sprintf("%s/keycloakauth/complete", strings.TrimSuffix(redirectURL, "/")),
 	}
 
 	u.Handle("/keycloakauth/login", uhttp.NewHandler(
+		uhttp.WithRequiredGet(uhttp.R{
+			"redirectUrl": uhttp.STRING,
+		}),
 		uhttp.WithGet(func(r *http.Request, returnCode *int) interface{} {
 			w := r.Context().Value(uhttp.CtxKeyResponseWriter).(http.ResponseWriter)
+			redirectURL := uhttp.GetAsString("redirectUrl", r)
+
+			// save client's specific redirect url
+			http.SetCookie(w, &http.Cookie{
+				Name:     "redirect-url",
+				Value:    *redirectURL,
+				MaxAge:   int(time.Hour.Seconds()),
+				Secure:   r.TLS != nil,
+				HttpOnly: true,
+			})
 
 			// create and set state in client
 			state := uuid.New().String()
@@ -55,11 +69,13 @@ func (k *KeycloakAuth) SetupHandlers(u *uhttp.UHTTP) {
 
 	u.Handle("/keycloakauth/complete", uhttp.NewHandler(
 		uhttp.WithGet(func(r *http.Request, returnCode *int) interface{} {
+			w := r.Context().Value(uhttp.CtxKeyResponseWriter).(http.ResponseWriter)
+
 			// Verify state
 			// compare value in get-request (from redirect) to value saved in cookie
 			stateCookie, err := r.Cookie("state")
 			if err != nil {
-				return errors.New("stateCookie not found")
+				return errors.New("state-cookie not found")
 			}
 			if r.URL.Query().Get("state") != stateCookie.Value {
 				return errors.New("state-cookie and state from redirect do not match")
@@ -85,18 +101,32 @@ func (k *KeycloakAuth) SetupHandlers(u *uhttp.UHTTP) {
 			// compare value saved in cookie with value encoded in id_token
 			nonceCookie, err := r.Cookie("nonce")
 			if err != nil {
-				return errors.New("nonceCookie not found")
+				return errors.New("nonce-cookie not found")
 			}
 			if idToken.Nonce != nonceCookie.Value {
 				return errors.New("nonce-cookie and id_token.nonce do not match")
 			}
 
-			return map[string]interface{}{
-				"token":            token,
-				"id_token":         rawIDToken,
-				"id_token_content": idToken,
+			redirectURL, err := r.Cookie("redirect-url")
+			if err != nil {
+				return errors.New("redirect-url-cookie not found")
 			}
+
+			idTokenClaims := map[string]interface{}{}
+			if err := idToken.Claims(&idTokenClaims); err != nil {
+				return fmt.Errorf("could not parse idToken (%s)", err)
+			}
+
+			http.Redirect(w, r,
+				fmt.Sprintf("%s?access_token=%s&refresh_token=%s&id_token=%s",
+					redirectURL.Value,
+					token.AccessToken,
+					token.RefreshToken,
+					rawIDToken,
+				),
+				http.StatusFound,
+			)
+			return nil
 		}),
 	))
-
 }

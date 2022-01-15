@@ -2,8 +2,6 @@ package keycloakauth
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -18,8 +16,6 @@ type KeycloakAuth struct {
 	provider        *oidc.Provider
 	idTokenVerifier *oidc.IDTokenVerifier
 	remoteKeySet    *oidc.RemoteKeySet
-
-	apiURL string
 }
 
 func NewKeycloakAuth(
@@ -30,8 +26,6 @@ func NewKeycloakAuth(
 	clientID string,
 	// ClientSecret as registered in Keycloak
 	clientSecret string,
-	// URL under which this API runs (this will be used to construct the redirect_uri)
-	apiURL string,
 ) (*KeycloakAuth, error) {
 	ctx := context.Background()
 
@@ -56,6 +50,5 @@ func NewKeycloakAuth(
 		provider:        provider,
 		idTokenVerifier: provider.Verifier(&oidc.Config{ClientID: clientID}),
 		remoteKeySet:    oidc.NewRemoteKeySet(ctx, keycloakWellKnown.JWKSURI),
-		apiURL:          fmt.Sprintf("%s/keycloakauth/complete", strings.TrimSuffix(apiURL, "/")),
 	}, nil
 }
