@@ -21,7 +21,7 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 		return func(w http.ResponseWriter, r *http.Request) {
 			token, err := k.TokenFromRequest(r)
 			if err != nil {
-				ulog.Trace(err)
+				ulog.Tracef("Could not get TokenFromRequest (%s)", err)
 				u.RenderError(w, r, fmt.Errorf("Unauthorized"))
 				return
 			}

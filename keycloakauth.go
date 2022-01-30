@@ -7,26 +7,24 @@ import (
 )
 
 type KeycloakAuth struct {
-	ctx            context.Context
-	oauthServerURL string
-	clientID       string
-	clientSecret   string
-
-	// oidc
-	provider        *oidc.Provider
-	idTokenVerifier *oidc.IDTokenVerifier
-	remoteKeySet    *oidc.RemoteKeySet
-}
-
-func NewKeycloakAuth(
 	// URL under which we can perform a GET request to `.well-kown/openid-configuration`
 	// e.g. https://<DOMAIN>:<PORT>/auth/realms/<REALM>
-	oauthServerURL string,
-	// ClientID as registered in Keycloak
-	clientID string,
-	// ClientSecret as registered in Keycloak
-	clientSecret string,
-) (*KeycloakAuth, error) {
+	oauthServerURL string
+
+	// reference to oidc provider (will be initialized
+	// by using oauthServerURL when creating a new instance)
+	provider *oidc.Provider
+
+	// reference to IDTokenVerifier (will be initialized
+	// by using oauthServerURL when creating a new instance)
+	idTokenVerifier *oidc.IDTokenVerifier
+
+	// reference to oidc.RemoteKeySet (will be initialized
+	// by using oauthServerURL when creating a new instance)
+	remoteKeySet *oidc.RemoteKeySet
+}
+
+func NewKeycloakAuth(oauthServerURL string) (*KeycloakAuth, error) {
 	ctx := context.Background()
 
 	// init oidc lib
@@ -43,12 +41,9 @@ func NewKeycloakAuth(
 	}
 
 	return &KeycloakAuth{
-		ctx:             ctx,
 		oauthServerURL:  oauthServerURL,
-		clientID:        clientID,
-		clientSecret:    clientSecret,
 		provider:        provider,
-		idTokenVerifier: provider.Verifier(&oidc.Config{ClientID: clientID}),
+		idTokenVerifier: provider.Verifier(&oidc.Config{}),
 		remoteKeySet:    oidc.NewRemoteKeySet(ctx, keycloakWellKnown.JWKSURI),
 	}, nil
 }
