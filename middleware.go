@@ -90,6 +90,15 @@ func (k *KeycloakAuth) TokenFromRequest(r *http.Request) (*KeycloakToken, error)
 	// Get Token from header
 	accessToken := strings.Replace(r.Header.Get("Authorization"), "Bearer ", "", 1)
 
+	// If there is no token in header, it might be in get-param
+	if accessToken == "" {
+		if getToken, ok := r.URL.Query()["token"]; ok {
+			accessToken = getToken[0]
+		} else {
+			return nil, fmt.Errorf("Unauthorized: no token found")
+		}
+	}
+
 	// Verify that the token is signed by someone we trust
 	_, err := k.remoteKeySet.VerifySignature(r.Context(), accessToken)
 	if err != nil {
