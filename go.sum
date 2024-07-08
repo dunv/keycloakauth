@@ -8,13 +8,10 @@ github.com/coreos/go-oidc/v3 v3.11.0 h1:Ia3MxdwpSw702YW0xgfmP1GVCMA9aEFWu12XUZ3/
 github.com/coreos/go-oidc/v3 v3.11.0/go.mod h1:gE3LgjOgFoHi9a4ce4/tJczr0Ai2/BoDhf0r5lltWI0=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dunv/uhelpers v1.0.14/go.mod h1:Y8BAqY06wly5JR18Yh7vpPSZ7aR950QoxTAQZD5lE9E=
 github.com/dunv/uhelpers v1.1.5 h1:9aH8IQ9N2S+2iAdYTKCbW++50Be+cqkM3MCEm1AEu2s=
 github.com/dunv/uhelpers v1.1.5/go.mod h1:7VJkgpArAxmttPbBKbjG8HUfgt3IyOeQ5JxyFBYcOnU=
 github.com/dunv/uhttp v1.2.10 h1:haGPZ+xVIuLovi1fQy2ACcRH9lMsL579DJNa23ytcIc=
 github.com/dunv/uhttp v1.2.10/go.mod h1://KdSo18VPxMruBlbu351ifuiFziHAim7DXYOqM2o9U=
-github.com/dunv/ulog v1.0.33 h1:dN9OdStr5dL03Lkdhc2LHsYLd+SbJ/qxp+CPFERIA1U=
-github.com/dunv/ulog v1.0.33/go.mod h1:CPPdZbNFyaYSqEuaYEBZbjfJNOQKTnti3ZE+2z3/wW4=
 github.com/go-jose/go-jose/v4 v4.0.2 h1:R3l3kkBds16bO7ZFAEEcofK0MkrAJt3jlJznWZG0nvk=
 github.com/go-jose/go-jose/v4 v4.0.2/go.mod h1:WVf9LFMHh/QVrmqrOfqun0C45tMe3RoiKJMPvgWwLfY=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=

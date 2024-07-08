@@ -7,7 +7,6 @@ toolchain go1.22.5
 require (
 	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/dunv/uhttp v1.2.10
-	github.com/dunv/ulog v1.0.33
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
