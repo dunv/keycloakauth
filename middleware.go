@@ -6,9 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dunv/uhelpers"
 	"github.com/dunv/uhttp"
-	"github.com/dunv/ulog"
 	jwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -21,7 +19,7 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 		return func(w http.ResponseWriter, r *http.Request) {
 			token, err := k.TokenFromRequest(r)
 			if err != nil {
-				ulog.Tracef("Could not get TokenFromRequest (%s)", err)
+				// ulog.Tracef("Could not get TokenFromRequest (%s)", err)
 				u.RenderError(w, r, fmt.Errorf("Unauthorized"))
 				return
 			}
@@ -37,15 +35,19 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 			}
 
 			if !accessGranted {
-				ulog.Tracef("Unauthorized: user does not have access to resource")
+				// ulog.Tracef("Unauthorized: user does not have access to resource")
 				u.RenderError(w, r, fmt.Errorf("Unauthorized"))
 				return
 			}
 
 			// add user to context
 			ctx := context.WithValue(r.Context(), CtxKeyKeycloakUser, *token)
-			ulog.LogIfError(uhttp.AddLogOutput(w, "authMethod", "jwt"))
-			ulog.LogIfError(uhttp.AddLogOutput(w, "user", token.PreferredUsername))
+			if err := uhttp.AddLogOutput(w, "authMethod", "jwt"); err != nil {
+				u.Log().Errorf("could not add log output: %s", err)
+			}
+			if err := uhttp.AddLogOutput(w, "user", token.PreferredUsername); err != nil {
+				u.Log().Errorf("could not add log output: %s", err)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 	}
@@ -63,8 +65,12 @@ func (k *KeycloakAuth) OptionalAuth(u *uhttp.UHTTP) func(next http.HandlerFunc) 
 
 			// add user to context
 			ctx := context.WithValue(r.Context(), CtxKeyKeycloakUser, *token)
-			ulog.LogIfError(uhttp.AddLogOutput(w, "authMethod", "jwt"))
-			ulog.LogIfError(uhttp.AddLogOutput(w, "user", token.PreferredUsername))
+			if err := uhttp.AddLogOutput(w, "authMethod", "jwt"); err != nil {
+				u.Log().Errorf("could not add log output: %s", err)
+			}
+			if err := uhttp.AddLogOutput(w, "user", token.PreferredUsername); err != nil {
+				u.Log().Errorf("could not add log output: %s", err)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 	}
@@ -125,7 +131,7 @@ func (k *KeycloakAuth) Permission(fn ...HasAccessFn) func(*http.Request) bool {
 	return func(r *http.Request) bool {
 		token, err := k.TokenFromRequest(r)
 		if err != nil {
-			ulog.Trace(err)
+			// ulog.Trace(err)
 			return false
 		}
 		accessGranted := len(fn) == 0
@@ -145,8 +151,10 @@ func LimitAccessToOr(resource string, roles ...string) HasAccessFn {
 	return func(t KeycloakToken) bool {
 		if resource, ok := t.ResourceAccess[resource]; ok {
 			for _, role := range resource.Roles {
-				if uhelpers.SliceContainsItem(roles, role) {
-					return true
+				for _, lookForRole := range roles {
+					if role == lookForRole {
+						return true
+					}
 				}
 			}
 		}
