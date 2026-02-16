@@ -10,8 +10,6 @@ import (
 	jwt "gopkg.in/square/go-jose.v2/jwt"
 )
 
-var CtxKeyKeycloakUser uhttp.ContextKey = "keycloakUser"
-
 // Require user authentication for this handler
 // If a hasAccessFn is passed it will also perform authorization
 func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) func(next http.HandlerFunc) http.HandlerFunc {
