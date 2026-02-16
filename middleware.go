@@ -12,7 +12,7 @@ import (
 
 // Require user authentication for this handler
 // If a hasAccessFn is passed it will also perform authorization
-func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) func(next http.HandlerFunc) http.HandlerFunc {
+func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) uhttp.Middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			token, err := k.TokenFromRequest(r)
@@ -52,7 +52,7 @@ func (k *KeycloakAuth) RequireAuth(u *uhttp.UHTTP, hasAccessFns ...HasAccessFn) 
 }
 
 // Add user information if it is there. If not, just continue
-func (k *KeycloakAuth) OptionalAuth(u *uhttp.UHTTP) func(next http.HandlerFunc) http.HandlerFunc {
+func (k *KeycloakAuth) OptionalAuth(u *uhttp.UHTTP) uhttp.Middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			token, err := k.TokenFromRequest(r)
